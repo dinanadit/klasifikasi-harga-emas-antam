@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+import pandas as pd
 
 
 # =========================================================
@@ -7,6 +8,7 @@ from pathlib import Path
 # =========================================================
 
 DATABASE_PATH = Path("database.db")
+EXCEL_PATH = Path("ANTAM_Harga_dan_Buyback_2021_2025.xlsx")
 
 
 # =========================================================
@@ -17,6 +19,121 @@ def get_connection():
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# =========================================================
+# IMPORT DATA EXCEL JIKA DATABASE MASIH KOSONG
+# =========================================================
+
+def import_historical_data_if_empty():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Cek jumlah data historis yang sudah ada
+    cursor.execute(
+        "SELECT COUNT(*) FROM historical_prices"
+    )
+
+    jumlah_data = cursor.fetchone()[0]
+
+    # Jika database sudah berisi data, jangan import ulang
+    if jumlah_data > 0:
+        conn.close()
+        return
+
+    # Jika file Excel tidak tersedia, hentikan proses import
+    if not EXCEL_PATH.exists():
+        conn.close()
+        return
+
+    # Baca Excel
+    df = pd.read_excel(EXCEL_PATH)
+
+    # Pastikan kolom tersedia
+    required_columns = [
+        "Date",
+        "Price",
+        "Buyback"
+    ]
+
+    missing_columns = [
+        col
+        for col in required_columns
+        if col not in df.columns
+    ]
+
+    if missing_columns:
+        conn.close()
+        raise ValueError(
+            f"Kolom berikut tidak ditemukan di Excel: "
+            f"{missing_columns}"
+        )
+
+    # Ambil kolom yang diperlukan
+    df = df[required_columns].copy()
+
+    # Konversi tanggal
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce"
+    )
+
+    # Konversi harga
+    df["Price"] = pd.to_numeric(
+        df["Price"],
+        errors="coerce"
+    )
+
+    df["Buyback"] = pd.to_numeric(
+        df["Buyback"],
+        errors="coerce"
+    )
+
+    # Hapus data tidak valid
+    df = df.dropna(
+        subset=[
+            "Date",
+            "Price",
+            "Buyback"
+        ]
+    )
+
+    # Urutkan berdasarkan tanggal
+    df = df.sort_values("Date")
+
+    # Hapus duplikat tanggal
+    df = df.drop_duplicates(
+        subset=["Date"],
+        keep="first"
+    )
+
+    # Masukkan data ke database
+    for _, row in df.iterrows():
+
+        tanggal = row["Date"].strftime("%Y-%m-%d")
+        harga_jual = float(row["Price"])
+        harga_buyback = float(row["Buyback"])
+
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO historical_prices
+            (
+                tanggal,
+                harga_jual,
+                harga_buyback
+            )
+            VALUES (?, ?, ?)
+            """,
+            (
+                tanggal,
+                harga_jual,
+                harga_buyback
+            )
+        )
+
+    conn.commit()
+    conn.close()
 
 
 # =========================================================
@@ -92,6 +209,9 @@ def init_database():
 
     conn.commit()
     conn.close()
+
+    # Setelah tabel dibuat, cek apakah data historis kosong
+    import_historical_data_if_empty()
 
 
 # =========================================================
