@@ -60,27 +60,6 @@ FITUR_FINAL = [
 # ============================================================
 
 init_database()
-
-
-# PEMERIKSAAN SEMENTARA AKUN
-conn_cek = get_connection()
-cursor_cek = conn_cek.cursor()
-
-cursor_cek.execute(
-    "SELECT username, is_active FROM users WHERE username = ?",
-    ("user3",)
-)
-hasil_cek = cursor_cek.fetchone()
-
-if hasil_cek:
-    st.warning(
-        f"DIAGNOSTIK: user3 ditemukan; status aktif = "
-        f"{hasil_cek['is_active']}"
-    )
-else:
-    st.warning("DIAGNOSTIK: user3 tidak ditemukan")
-
-conn_cek.close()
 # ============================================================
 # SESSION STATE
 # ============================================================
