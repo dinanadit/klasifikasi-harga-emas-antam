@@ -1,7 +1,7 @@
 import os
 import hashlib
 import secrets
-import sqlite3
+import mysql.connector
 from datetime import datetime
 
 import joblib
@@ -202,7 +202,7 @@ def register_user(username, password):
                 username,
                 password_hash
             )
-            VALUES (?, ?)
+            VALUES (%s, %s)
             """,
             (
                 username,
@@ -214,7 +214,7 @@ def register_user(username, password):
 
         return True, "Registrasi berhasil."
 
-    except sqlite3.IntegrityError:
+    except mysql.connector.IntegrityError:
 
         return False, "Username sudah digunakan."
 
@@ -229,7 +229,7 @@ def login_user(username, password):
 
     try:
 
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
             """
@@ -239,7 +239,7 @@ def login_user(username, password):
                 password_hash,
                 is_active
             FROM users
-            WHERE username = ?
+            WHERE username = %s
             """,
             (username.strip(),)
         )
@@ -262,7 +262,7 @@ def login_user(username, password):
             """
             UPDATE users
             SET last_login = CURRENT_TIMESTAMP
-            WHERE id_user = ?
+            WHERE id_user = %s
             """,
             (user["id_user"],)
         )
@@ -330,10 +330,10 @@ def load_historical_data():
             ORDER BY tanggal ASC
         """
 
-        data = pd.read_sql_query(
-            query,
-            conn
-        )
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        data = pd.DataFrame(rows)
 
     finally:
 
@@ -567,20 +567,20 @@ def save_classification_history(
             )
             VALUES
             (
-                ?,
-                ?,
-                ?,
+                %s,
+                %s,
+                %s,
 
-                ?,
-                ?,
-                ?,
+                %s,
+                %s,
+                %s,
 
-                ?,
-                ?,
-                ?,
+                %s,
+                %s,
+                %s,
 
-                ?,
-                ?
+                %s,
+                %s
             )
             """,
             (
@@ -2072,19 +2072,19 @@ def show_classification_history():
 
             FROM classification_history
 
-            WHERE id_user = ?
+            WHERE id_user = %s
 
             ORDER BY waktu_klasifikasi DESC
         """
 
 
-        history = pd.read_sql_query(
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
             query,
-            conn,
-            params=(
-                st.session_state.id_user,
-            )
+            (st.session_state.id_user,)
         )
+        rows = cursor.fetchall()
+        history = pd.DataFrame(rows)
 
     finally:
 

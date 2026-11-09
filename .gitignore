@@ -1,0 +1,14 @@
+# Rahasia database
+.streamlit/secrets.toml
+
+# Database lokal SQLite
+*.db
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Environment lokal
+.venv/
+venv/
+.env
